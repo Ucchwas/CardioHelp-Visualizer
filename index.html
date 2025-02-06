@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ZIP Code Visualizer</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { width: 100%; height: 600px; }
+  </style>
+</head>
+<body>
+  <h1>ZIP Code Visualizer</h1>
+  <div id="map"></div>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // Initialize the map centered over the US
+    var map = L.map('map').setView([39.8283, -98.5795], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Fetch patient data from your API
+    fetch('http://10.131.58.143:3000/api/zipcodes')
+      .then(response => response.json())
+      .then(zipData => {
+        // Load the GeoJSON file with ZIP boundaries (make sure this file is in your project folder)
+        fetch('zipcodes.geojson')
+          .then(response => response.json())
+          .then(geojsonData => {
+
+            // Function to choose a color based on patient count.
+            // Modify thresholds to show dark red for higher counts.
+            function getColor(count) {
+              return count > 10 ? '#B03A2E' :  // very high: dark red
+                     count > 8 ? '#CB4335' :  // high count: medium dark red
+                     count > 6 ? '#E74C3C' :
+                     count > 4 ? '#EC7063' :
+                     count > 2 ? '#F1948A' :
+                     count > 0  ? '#F5B7B1' :  // low count: red
+                                  '#FEF9E7';      // no patients: light color
+            }
+
+            // Apply styling to each ZIP region
+            function style(feature) {
+              // Get the ZIP code from the GeoJSON. Adjust property name if needed.
+              var zipcode = feature.properties.ZCTA5CE10 || feature.properties.zip;
+              var count = zipData[zipcode] || 0;
+              return {
+                fillColor: getColor(count),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '2',
+                fillOpacity: 0.7
+              };
+            }
+
+            // Add the GeoJSON layer to the map with popups showing the data
+            L.geoJson(geojsonData, {
+              style: style,
+              onEachFeature: function(feature, layer) {
+                var zipcode = feature.properties.ZCTA5CE10 || feature.properties.zip;
+                var count = zipData[zipcode] || 0;
+                layer.bindPopup("ZIP: " + zipcode + "<br>Patients: " + count);
+              }
+            }).addTo(map);
+          })
+          .catch(err => console.error('Error loading GeoJSON:', err));
+      })
+      .catch(err => console.error('Error fetching ZIP data:', err));
+  </script>
+</body>
+</html>
